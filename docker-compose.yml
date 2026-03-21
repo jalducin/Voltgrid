@@ -1,32 +1,32 @@
-# docker-compose.yml
+# docker-compose.yml — raíz del proyecto S2G Energy Dashboard
 services:
-  db:
-    image: mysql:8.0
-    container_name: s2g-db
-    command: --default-authentication-plugin=mysql_native_password
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE:      ${MYSQL_DATABASE}
-    volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
 
   backend:
-    build: .
+    build:
+      context: ./backend-s2g
+      dockerfile: Dockerfile
     container_name: s2g-backend
-    depends_on:
-      - db
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - ./backend-s2g/.env
     volumes:
-      - .:/app
+      - ./backend-s2g:/app       # live reload en desarrollo
+      - s2g_db:/app/s2g.db       # persiste el archivo SQLite
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend-s2g
+      dockerfile: Dockerfile
+    container_name: s2g-frontend
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     restart: always
 
 volumes:
-  db_data:
+  s2g_db:

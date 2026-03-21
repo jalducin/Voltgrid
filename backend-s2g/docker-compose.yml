@@ -1,0 +1,12 @@
+# docker-compose.yml
+services:
+  backend:
+    build: .
+    container_name: s2g-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    restart: always

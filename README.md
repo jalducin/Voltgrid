@@ -1,161 +1,158 @@
-# Backend - S2G Energy Challenge
+# S2G Energy Dashboard
 
-**Repositorio:** [https://github.com/jalducin/backend-s2g](https://github.com/jalducin/backend-s2g)
-
----
-
-## Tecnologías
-
-* **Lenguaje:** Python 3.11
-* **Framework web:** FastAPI
-* **ORM:** SQLAlchemy
-* **Base de datos:** MySQL (dockerizado)
-* **Tareas programadas:** APScheduler
-* **Gestión de configuración:** python-dotenv
-* **Autenticación:** python-jose (JWT)
-* **Contenedores:** Docker & Docker Compose
-* **Validación de datos:** Pydantic (<2.0)
+Sistema de gestión de estaciones de carga eléctrica.
+Backend FastAPI + SQLite · Frontend Next.js 14 + Tailwind CSS.
 
 ---
 
-## Características
+## Servicios
 
-* **Autenticación JWT** con usuario/contraseña hardcoded.
-* **CRUD de estaciones** de carga: registrar, listar y actualizar estado (activo/inactivo).
-* **Estadísticas** en tiempo real (`GET /stations/stats`): total, activos, inactivos, suma de kW.
-* **Scheduler automático** que alterna estados cada minuto y **endpoint manual** para dispararlo (`POST /scheduler/run`).
-* **Carga de datos de ejemplo** desde CSV mediante `scripts/seed.py`.
-* **Docker Compose** orquesta los servicios `db` (MySQL) y `backend` (FastAPI).
-
----
-
-## Arquitectura
-
-```txt
-+-------------+      +---------------+      +--------------+
-|  Cliente UI | <--> |  FastAPI API  | <--> |   MySQL DB   |
-+-------------+      +---------------+      +--------------+
-                             |
-                             v
-                  +----------------------+
-                  |    APScheduler job   |
-                  +----------------------+
-```
-
----
-
-## Estructura de carpetas
-
-```bash
-backend-s2g/
-├── app/
-│   ├── core/           # Configuración, DB, scheduler
-│   ├── models/         # Modelos SQLAlchemy
-│   ├── routers/        # Endpoints (auth, stations, stats, scheduler)
-│   └── schemas/        # Pydantic schemas
-├── data/               # CSV de datos de ejemplo
-├── scripts/            # Seed script
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── .env                # Variables de entorno
-└── README.md
-```
+| Servicio | Tecnología | Puerto |
+|---|---|---|
+| Backend API | FastAPI + SQLite | `8000` |
+| Frontend | Next.js 14 | `3000` |
 
 ---
 
 ## Requisitos
 
-* Docker (>=20.10)
-* Docker Compose (>=1.29)
-* (Opcional) Python 3.11 para ejecución local sin contenedores
+- Docker >= 20.10
+- Docker Compose >= 2.0
 
 ---
 
-## Variables de entorno
+## Levantar todo con Docker Compose
 
-Crea un archivo `.env` en la raíz con:
+Desde la raíz del proyecto:
+
+```bash
+# Primera vez o después de cambios en código
+docker compose up --build
+
+# Siguientes veces (sin rebuild)
+docker compose up
+
+# En segundo plano
+docker compose up -d --build
+```
+
+Servicios disponibles:
+
+```
+http://localhost:8000        API Backend
+http://localhost:8000/docs   Swagger UI
+http://localhost:3000        Dashboard Frontend
+```
+
+Cargar datos de ejemplo (opcional, solo una vez):
+
+```bash
+docker exec -it s2g-backend python -m scripts.seed
+```
+
+Detener y limpiar:
+
+```bash
+docker compose down           # detiene contenedores
+docker compose down -v        # detiene y borra volumen SQLite
+```
+
+---
+
+## Desarrollo local (sin Docker)
+
+### Backend
+
+```bash
+cd backend-s2g
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+Variables necesarias en `backend-s2g/.env`:
 
 ```dotenv
-MYSQL_ROOT_PASSWORD=DevOps25%
-MYSQL_DATABASE=s2g_db
-DATABASE_URL=mysql+pymysql://root:DevOps25%@db/s2g_db
-SECRET_KEY=<tu_clave_secreta>
+DATABASE_URL=sqlite:///./s2g.db
+SECRET_KEY=a1b2c3d4-e5f6-7890-1234-56789abcdef0
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=720
 ```
 
----
-
-## Instalación y ejecución
-
-### Con Docker Compose
+### Frontend
 
 ```bash
-# Limpia instancias anteriores
-docker-compose down --volumes --remove-orphans
-
-# Construye y levanta servicios
-docker-compose up -d --build
-
-# Verifica que estén en "Up"
-docker-compose ps
-
-# Espera a que MySQL esté listo y luego carga datos de ejemplo:
-docker exec -it --workdir /app s2g-backend python -m scripts.seed
-
-# Accede a la documentación interactiva:
-http://localhost:8000/docs
+cd frontend-s2g
+npm install
+npm run dev
 ```
 
-### Sin Docker Compose (solo Docker)
+Variable necesaria en `frontend-s2g/.env.local`:
 
-```bash
-# Construye la imagen (desde la raíz)
-docker build -t s2g-backend .
-
-# Lanza el contenedor vinculado a MySQL externo
-docker run \
-  -e DATABASE_URL=mysql+pymysql://root:DevOps25%@host.docker.internal:3306/s2g_db \
-  -p 8000:8000 s2g-backend
+```dotenv
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 ---
 
-## Endpoints
+## Credenciales de prueba
 
-### Autenticación y autorización
-
-* **POST** `/auth/login`
-  Form data: `username`, `password`
-  -> `{ "access_token": "<token>", "token_type": "bearer" }`
-
-### Estaciones (requieren token Bearer)
-
-* **POST** `/stations/`
-  Crea estación. Body JSON: `{ name, location, max_kw, status }`
-* **GET** `/stations/`
-  Lista todas las estaciones.
-* **PATCH** `/stations/{id}`
-  Actualiza `status` (`?status=activo|inactivo`).
-* **GET** `/stations/stats`
-  Estadísticas agregadas.
-
-### Scheduler
-
-* **POST** `/scheduler/run`
-  Ejecuta manualmente el job de cambio de estado.
+```
+Email:    admin@s2g.com
+Password: 123456
+```
 
 ---
-## 👨‍💻 Autor
 
-**Elaborado por ISC Juan Valentín Alducin Vázquez**  
-📅 Mayo 2025  
-🔗 [GitHub](https://github.com/jalducin)
-## Git
-git add .
-git commit -m "Actualización BackendS2Energy"
-git push origin main
+## Estructura del repositorio
+
+```
+Crud-PythonReact/
+├── backend-s2g/           # API FastAPI + SQLite
+│   ├── app/
+│   │   ├── core/          # config, database, auth, scheduler
+│   │   ├── models/        # Station (SQLAlchemy)
+│   │   ├── routers/       # auth, station, stats, scheduler
+│   │   └── schemas/       # Pydantic schemas
+│   ├── data/              # estaciones.csv (datos de ejemplo)
+│   ├── scripts/           # seed.py
+│   ├── .env
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   └── main.py
+├── frontend-s2g/          # Dashboard Next.js
+│   ├── components/        # Login, StationForm, StationList, StationChart
+│   ├── pages/             # _app.tsx, index.tsx
+│   ├── utils/             # api.ts (Axios + interceptor JWT)
+│   ├── styles/            # globals.css (Tailwind)
+│   ├── .env.local
+│   ├── Dockerfile
+│   └── docker-compose.yml
+├── docker-compose.yml     # Orquesta backend + frontend
+└── README.md
+```
+
+---
+
+## API — resumen de endpoints
+
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| POST | `/auth/login` | No | Login — devuelve JWT |
+| GET | `/stations` | Bearer | Lista estaciones |
+| GET | `/stations?status=activo` | Bearer | Lista filtrada |
+| POST | `/stations` | Bearer | Crear estación |
+| PATCH | `/stations/{id}?new_status=activo` | Bearer | Cambiar estado |
+| GET | `/stations/stats` | Bearer | Totales y capacidad |
+| POST | `/scheduler/run` | Bearer | Ejecutar scheduler manualmente |
+
+---
+
+## Autor
+
+**ISC Juan Valentín Alducin Vázquez** — Mayo 2025
+[GitHub](https://github.com/jalducin)
 
 ## Licencia
 
