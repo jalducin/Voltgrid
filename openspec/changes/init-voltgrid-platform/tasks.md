@@ -3,7 +3,7 @@
 - [x] 0.1 Crear y cambiar a la feature branch `feature/init-voltgrid-platform`
 - [x] 0.2 Montar andamiaje SDD (openspec, docs, ai-specs, .claude, .gemini) e instanciar config/project
 - [x] 0.3 Renombrar `backend-s2g`→`voltgrid-api`, `frontend-s2g`→`voltgrid-web`
-- [ ] 0.4 Crear repo GitHub `jalducin/voltgrid` (público) y push inicial — requiere `gh auth login` del usuario
+- [x] 0.4 Crear repo GitHub `jalducin/voltgrid` (público) y push inicial — https://github.com/jalducin/voltgrid
 
 ## 1. Backend — núcleo (organizations-multitenancy, auth-rbac)
 
