@@ -3,7 +3,7 @@
 - [x] 0.1 Crear y cambiar a la feature branch `feature/init-voltgrid-platform`
 - [x] 0.2 Montar andamiaje SDD (openspec, docs, ai-specs, .claude, .gemini) e instanciar config/project
 - [x] 0.3 Renombrar `backend-s2g`→`voltgrid-api`, `frontend-s2g`→`voltgrid-web`
-- [x] 0.4 Crear repo GitHub `jalducin/voltgrid` (público) y push inicial
+- [ ] 0.4 Crear repo GitHub `jalducin/voltgrid` (público) y push inicial — requiere `gh auth login` del usuario
 
 ## 1. Backend — núcleo (organizations-multitenancy, auth-rbac)
 
@@ -52,4 +52,4 @@
 ## 7. Documentación y cierre (OBLIGATORIO)
 
 - [x] 7.1 README profesional + `docs/ARCHITECTURE.md` + `docs/DOCS_INVENTORY.md`; actualizar `docs/*-standards.md` si cambió algo
-- [x] 7.2 `opsx:verify` contra los artefactos y `opsx:archive` del cambio
+- [x] 7.2 Verificación contra los artefactos (reporte Step 6 PASS). Pendiente: `opsx:archive` (requiere CLI OpenSpec) para promover specs a `openspec/specs/`
