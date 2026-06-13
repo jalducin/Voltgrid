@@ -1,0 +1,80 @@
+# StatefulSet de PostgreSQL para entornos en-cluster (dev/local-k8s).
+# En PROD se prefiere una BD gestionada externa (RDS/Cloud SQL); ver overlays/prod.
+# El init SQL (rol voltgrid_app, extensiones, RLS) se monta desde un ConfigMap
+# generado por Kustomize a partir de infra/postgres/init/01-init.sql.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: voltgrid-postgres
+  labels:
+    app.kubernetes.io/name: voltgrid-postgres
+spec:
+  serviceName: voltgrid-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: voltgrid-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: voltgrid-postgres
+    spec:
+      securityContext:
+        # Imagen oficial postgres corre como usuario 'postgres' (uid 999/70 según base).
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: "voltgrid"
+            - name: POSTGRES_DB
+              value: "voltgrid"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: voltgrid-secret
+                  key: POSTGRES_PASSWORD
+            # Subdirectorio para no chocar con lost+found en el PV.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+      volumes:
+        - name: init
+          configMap:
+            name: voltgrid-postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

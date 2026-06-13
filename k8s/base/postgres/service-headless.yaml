@@ -1,0 +1,16 @@
+# Service headless (clusterIP: None) para el StatefulSet de Postgres.
+# Da DNS estable: voltgrid-postgres.<namespace>.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: voltgrid-postgres
+  labels:
+    app.kubernetes.io/name: voltgrid-postgres
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: voltgrid-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

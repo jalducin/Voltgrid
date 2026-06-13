@@ -1,0 +1,45 @@
+# Ingress nginx. Enrutado por path:
+#   /     -> voltgrid-web:3000
+#   /api  -> voltgrid-api:8000
+# TLS gestionado por cert-manager. Anotaciones de WebSocket: timeouts altos para
+# conexiones persistentes y affinity por cookie para pegar el WS a un mismo pod.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: voltgrid
+  labels:
+    app.kubernetes.io/part-of: voltgrid
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # WebSocket: subir timeouts de lectura/escritura del proxy.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Affinity por cookie para mantener el WS en el mismo backend.
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/affinity-mode: "persistent"
+    nginx.ingress.kubernetes.io/session-cookie-name: "voltgrid-affinity"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - voltgrid.example.com
+      secretName: voltgrid-tls
+  rules:
+    - host: voltgrid.example.com
+      http:
+        paths:
+          # /api enruta a la API. Debe ir ANTES de "/" para precedencia de prefijo.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: voltgrid-api
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: voltgrid-web
+                port:
+                  number: 3000

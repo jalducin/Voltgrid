@@ -1,29 +1,39 @@
-// components/StationChart.tsx
-import React from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+'use client';
 
-interface Station {
-  name: string
-  max_kw: number
-}
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import type { Station } from '@/lib/types';
 
-interface StationChartProps {
-  stations: Station[]
-}
+// Gráfica de barras de la capacidad (max_kw) por estación.
+export function StationChart({ stations }: { stations: Station[] }) {
+  const data = stations.map((s) => ({ name: s.name, max_kw: s.max_kw }));
 
-export default function StationChart({ stations }: StationChartProps) {
-  const data = stations.map((s) => ({ name: s.name, kW: s.max_kw }))
+  if (data.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-gray-500">
+        No hay estaciones para graficar.
+      </p>
+    );
+  }
 
   return (
-    <div className="h-64 mt-6">
+    <div className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data}>
-          <XAxis dataKey="name" />
-          <YAxis />
-          <Tooltip />
-          <Bar dataKey="kW" />
+        <BarChart data={data} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+          <YAxis tick={{ fontSize: 12 }} unit=" kW" width={56} />
+          <Tooltip formatter={(value: number) => [`${value} kW`, 'Capacidad']} />
+          <Bar dataKey="max_kw" fill="var(--primary)" radius={[4, 4, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
-  )
+  );
 }

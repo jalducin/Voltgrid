@@ -1,0 +1,66 @@
+# Deployment del frontend Next.js (standalone, `node server.js`).
+# NEXT_PUBLIC_API_URL se hornea en build (build arg), no en runtime.
+# Probes contra /api/health (route handler de health del propio Next.js).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voltgrid-web
+  labels:
+    app.kubernetes.io/name: voltgrid-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: voltgrid-web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: voltgrid-web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: voltgrid-web:latest
+          ports:
+            - name: http
+              containerPort: 3000
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      volumes:
+        - name: tmp
+          emptyDir: {}

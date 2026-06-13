@@ -1,0 +1,88 @@
+# Deployment de la API FastAPI.
+#   * Rol runtime NO superusuario (DATABASE_URL del Secret = voltgrid_app) -> RLS aplica.
+#   * SCHEDULER_ENABLED=false: el scheduling lo hace el Deployment `scheduler` (replicas=1).
+#   * RUN_MIGRATIONS=false: las migraciones las corre el Job de migración por release.
+#   * Probes: /health/ready (readiness, toca BD), /health/live (liveness + startup, sin BD).
+#   * securityContext endurecido (non-root, FS de solo lectura, drop ALL).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: voltgrid-api
+  labels:
+    app.kubernetes.io/name: voltgrid-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: voltgrid-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: voltgrid-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          image: voltgrid-api:latest
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: voltgrid-config
+            - secretRef:
+                name: voltgrid-secret
+          env:
+            # Overrides explícitos: esta réplica NO migra ni programa jobs.
+            - name: SCHEDULER_ENABLED
+              value: "false"
+            - name: RUN_MIGRATIONS
+              value: "false"
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # /tmp escribible (FS raíz es de solo lectura).
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+      volumes:
+        - name: tmp
+          emptyDir: {}

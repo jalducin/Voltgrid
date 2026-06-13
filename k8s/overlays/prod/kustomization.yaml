@@ -1,0 +1,61 @@
+# Overlay PROD: namespace propio, más réplicas, host e issuer de producción.
+#
+# NOTA IMPORTANTE: en producción se PREFIERE una base de datos gestionada externa
+# (RDS / Cloud SQL / Azure DB), no el StatefulSet de Postgres en-cluster. Para ello:
+#   1) Quita postgres/statefulset.yaml y postgres/service-headless.yaml del despliegue
+#      (p. ej. con un patch de borrado o un componente que los excluya), y
+#   2) Apunta DATABASE_URL / SYNC_DATABASE_URL / MIGRATIONS_DATABASE_URL del Secret
+#      al endpoint gestionado.
+# Aquí se dejan incluidos para que `kustomize build` valide; ajusta según tu plataforma.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: voltgrid-prod
+
+resources:
+  - ../../base
+
+images:
+  - name: voltgrid-api
+    newTag: stable
+  - name: voltgrid-web
+    newTag: stable
+
+replicas:
+  - name: voltgrid-api
+    count: 3
+  - name: voltgrid-web
+    count: 3
+
+configMapGenerator:
+  - name: voltgrid-config
+    behavior: merge
+    envs:
+      - config.env
+
+patches:
+  # Host de prod + issuer de producción de cert-manager.
+  - target:
+      kind: Ingress
+      name: voltgrid
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: voltgrid.example.com
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: voltgrid.example.com
+      - op: replace
+        path: /metadata/annotations/cert-manager.io~1cluster-issuer
+        value: letsencrypt-prod
+  # En prod, HPA con techo más alto.
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: voltgrid-api
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20

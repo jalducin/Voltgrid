@@ -1,0 +1,47 @@
+# Base de Kustomize para VoltGrid. Los overlays (dev/prod) parchean réplicas,
+# tags de imagen, host del Ingress y namespace. NO duplicar manifiestos a mano.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: voltgrid
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: voltgrid
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.example.yaml
+  - postgres/statefulset.yaml
+  - postgres/service-headless.yaml
+  - api/deployment.yaml
+  - api/service.yaml
+  - api/hpa.yaml
+  - api/migration-job.yaml
+  - scheduler/deployment.yaml
+  - web/deployment.yaml
+  - web/service.yaml
+  - ingress.yaml
+
+# ConfigMap con el SQL de init de Postgres, derivado del archivo canónico del repo
+# (una sola fuente de verdad: infra/postgres/init/01-init.sql, también usado por
+# docker-compose). Como el archivo vive FUERA de k8s/, Kustomize exige relajar el
+# restrictor de carga: usa siempre `--load-restrictor LoadRestrictionsNone`
+#   kubectl kustomize --load-restrictor LoadRestrictionsNone k8s/overlays/dev
+#   kubectl apply   -k k8s/overlays/dev --load-restrictor LoadRestrictionsNone
+configMapGenerator:
+  - name: voltgrid-postgres-init
+    files:
+      - 01-init.sql=../../infra/postgres/init/01-init.sql
+
+# No agregar hash al nombre del ConfigMap de init (lo referencia el StatefulSet por nombre).
+generatorOptions:
+  disableNameSuffixHash: true
+
+images:
+  - name: voltgrid-api
+    newTag: latest
+  - name: voltgrid-web
+    newTag: latest

@@ -1,0 +1,55 @@
+# Overlay DEV: namespace propio, 1 réplica por servicio, imágenes :dev, host dev,
+# Postgres en-cluster (StatefulSet de la base). Issuer de cert staging.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: voltgrid-dev
+
+resources:
+  - ../../base
+
+images:
+  - name: voltgrid-api
+    newTag: dev
+  - name: voltgrid-web
+    newTag: dev
+
+replicas:
+  - name: voltgrid-api
+    count: 1
+  - name: voltgrid-web
+    count: 1
+
+# Sobre-escribe el ConfigMap no-secreto con valores de dev (merge por nombre).
+configMapGenerator:
+  - name: voltgrid-config
+    behavior: merge
+    envs:
+      - config.env
+
+patches:
+  # Host de dev en el Ingress + issuer staging.
+  - target:
+      kind: Ingress
+      name: voltgrid
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev.voltgrid.example.com
+      - op: replace
+        path: /spec/tls/0/hosts/0
+        value: dev.voltgrid.example.com
+      - op: replace
+        path: /metadata/annotations/cert-manager.io~1cluster-issuer
+        value: letsencrypt-staging
+  # En dev no escalamos automáticamente: HPA min/max a 1.
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: voltgrid-api
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3

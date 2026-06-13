@@ -1,32 +1,152 @@
-# docker-compose.yml — raíz del proyecto S2G Energy Dashboard
+# =============================================================================
+# VoltGrid — docker-compose para desarrollo local.
+#
+# Topología y por qué de los roles de base de datos:
+#   * `postgres` arranca con POSTGRES_USER (superusuario / ADMIN). En el primer
+#     boot ejecuta infra/postgres/init/01-init.sql, que crea el rol de aplicación
+#     `voltgrid_app` (NOSUPERUSER NOBYPASSRLS) y configura privilegios por default.
+#   * `migrate` es un servicio efímero (one-shot) que corre `alembic upgrade head`
+#     conectado como el rol ADMIN (POSTGRES_USER), porque las migraciones crean
+#     tablas/políticas y necesitan privilegios de DDL/ownership.
+#       -> Alembic lee SIEMPRE settings.DATABASE_URL, así que a `migrate` le pasamos
+#          DATABASE_URL apuntando al rol ADMIN.
+#   * `api` y `scheduler` corren como el rol `voltgrid_app` (NO superusuario) para
+#     que Row Level Security (RLS) aplique de verdad: un superusuario IGNORA RLS,
+#     lo que rompería el aislamiento multi-tenant.
+#       -> RUN_MIGRATIONS=false en estos servicios; las migraciones ya las hizo
+#          `migrate`. `api` y `scheduler` esperan a que `migrate` termine OK.
+#   * APScheduler corre EN PROCESO; debe haber exactamente UNA instancia. Por eso
+#     el scheduler es un servicio aparte (SCHEDULER_ENABLED=true) y la `api` corre
+#     con SCHEDULER_ENABLED=false. (En local el scheduler es opcional; ver perfil.)
+#
+# Configuración vía `.env` (gitignored). Ver `.env.example`.
+# =============================================================================
+
 services:
 
-  backend:
+  postgres:
+    image: postgres:16-alpine
+    container_name: voltgrid-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Scripts de inicialización (solo se ejecutan en el primer boot, BD vacía).
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    ports:
+      - "5432:5432"
+
+  # ---------------------------------------------------------------------------
+  # Migraciones (one-shot). Corre como ADMIN (POSTGRES_USER) y termina.
+  # ---------------------------------------------------------------------------
+  migrate:
     build:
-      context: ./backend-s2g
-      dockerfile: Dockerfile
-    container_name: s2g-backend
+      context: ./voltgrid-api
+    image: voltgrid-api:latest
+    container_name: voltgrid-migrate
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      # Alembic lee DATABASE_URL: aquí apunta al rol ADMIN para tener DDL/ownership.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SYNC_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      RUN_MIGRATIONS: "false"   # no usamos el entrypoint; corremos alembic directo
+      SCHEDULER_ENABLED: "false"
+    # Sobre-escribe el entrypoint para correr SOLO las migraciones y salir.
+    entrypoint: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # API FastAPI. Rol runtime NO superusuario (voltgrid_app) -> RLS aplica.
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ./voltgrid-api
+    image: voltgrid-api:latest
+    container_name: voltgrid-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://voltgrid_app:${VOLTGRID_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SYNC_DATABASE_URL: postgresql+psycopg://voltgrid_app:${VOLTGRID_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Migraciones ya aplicadas por el servicio `migrate`.
+      RUN_MIGRATIONS: "false"
+      # El scheduling lo hace el servicio `scheduler` (una sola instancia).
+      SCHEDULER_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
-    env_file:
-      - ./backend-s2g/.env
-    volumes:
-      - ./backend-s2g:/app       # live reload en desarrollo
-      - s2g_db:/app/s2g.db       # persiste el archivo SQLite
-    restart: always
 
-  frontend:
+  # ---------------------------------------------------------------------------
+  # Scheduler APScheduler. EXACTAMENTE una instancia. Opcional en local (perfil).
+  # ---------------------------------------------------------------------------
+  scheduler:
     build:
-      context: ./frontend-s2g
-      dockerfile: Dockerfile
-    container_name: s2g-frontend
+      context: ./voltgrid-api
+    image: voltgrid-api:latest
+    container_name: voltgrid-scheduler
+    restart: unless-stopped
+    profiles: ["scheduler"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://voltgrid_app:${VOLTGRID_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SYNC_DATABASE_URL: postgresql+psycopg://voltgrid_app:${VOLTGRID_APP_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      RUN_MIGRATIONS: "false"
+      SCHEDULER_ENABLED: "true"
     depends_on:
-      - backend
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------------------
+  # Frontend Next.js (standalone). NEXT_PUBLIC_API_URL se HORNEA al construir.
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: ./voltgrid-web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    image: voltgrid-web:latest
+    container_name: voltgrid-web
+    restart: unless-stopped
+    depends_on:
+      - api
     ports:
       - "3000:3000"
+
+  # ---------------------------------------------------------------------------
+  # Adminer (UI de BD). Solo bajo el perfil `tools`: `docker compose --profile tools up`.
+  # ---------------------------------------------------------------------------
+  adminer:
+    image: adminer:4
+    container_name: voltgrid-adminer
+    restart: unless-stopped
+    profiles: ["tools"]
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-    restart: always
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
 
 volumes:
-  s2g_db:
+  pgdata:

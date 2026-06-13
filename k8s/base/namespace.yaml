@@ -1,0 +1,7 @@
+# Namespace base. Los overlays pueden sustituirlo (namespace propio por entorno).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: voltgrid
+  labels:
+    app.kubernetes.io/part-of: voltgrid

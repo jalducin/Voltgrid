@@ -1,0 +1,14 @@
+# ConfigMap = configuración NO secreta, compartida por api/scheduler/migrate.
+# Los secretos (DSN, JWT, OAuth) viven en el Secret (ver secret.example.yaml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: voltgrid-config
+data:
+  ENV: "prod"
+  JWT_ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  CORS_ORIGINS: "https://voltgrid.example.com"
+  MICROSOFT_TENANT: "common"
+  OAUTH_REDIRECT_BASE_URL: "https://voltgrid.example.com"

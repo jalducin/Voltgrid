@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: voltgrid-api
+  labels:
+    app.kubernetes.io/name: voltgrid-api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: voltgrid-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

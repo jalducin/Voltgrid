@@ -1,0 +1,69 @@
+# Job de migraciones: corre `alembic upgrade head` UNA vez por release.
+#   * Se usa Job (no initContainer) para no ejecutar N veces con N réplicas de la API.
+#   * Corre como rol ADMIN: Alembic lee DATABASE_URL, así que mapeamos el valor del
+#     Secret MIGRATIONS_DATABASE_URL (rol admin, dueño de tablas) a DATABASE_URL.
+#   * ttlSecondsAfterFinished limpia el Job tras completar.
+#
+# NOTA de despliegue: el nombre lleva un sufijo de release en los overlays (o se
+# borra/recrea por release), porque los Jobs son inmutables en spec.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: voltgrid-migrate
+  labels:
+    app.kubernetes.io/name: voltgrid-migrate
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: voltgrid-migrate
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: voltgrid-api:latest
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: voltgrid-config
+            - secretRef:
+                name: voltgrid-secret
+          env:
+            # Alembic lee DATABASE_URL; aquí debe ser el rol ADMIN (dueño de tablas).
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: voltgrid-secret
+                  key: MIGRATIONS_DATABASE_URL
+            - name: RUN_MIGRATIONS
+              value: "false"
+            - name: SCHEDULER_ENABLED
+              value: "false"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      volumes:
+        - name: tmp
+          emptyDir: {}
