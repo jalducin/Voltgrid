@@ -5,7 +5,13 @@ __pycache__/
 *.pyd
 .Python
 venv/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
 .env
+.env.local
 
 # SQLite
 *.db
@@ -25,7 +31,3 @@ build/
 # OS
 .DS_Store
 Thumbs.db
-
-# Specs (documentación interna, no va al repo)
-SPEC_BACKEND.md
-SPEC_FRONTEND.md

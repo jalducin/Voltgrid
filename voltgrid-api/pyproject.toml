@@ -1,0 +1,19 @@
+[project]
+name = "voltgrid-api"
+version = "1.0.0"
+description = "VoltGrid API — plataforma SaaS multi-tenant de estaciones de carga EV"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["B008"]  # FastAPI usa llamadas en defaults (Depends())

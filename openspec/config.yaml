@@ -1,0 +1,64 @@
+schema: spec-driven
+
+# ---------------------------------------------------------------------------
+# Contexto del proyecto VoltGrid
+# Este bloque se muestra a la IA al crear cualquier artefacto OpenSpec.
+# ---------------------------------------------------------------------------
+context: |
+  Proyecto: VoltGrid — plataforma SaaS whitelabel, multi-tenant y en tiempo real para
+  operadores de infraestructura de carga de vehículos eléctricos (EV charging).
+
+  Stack tecnológico:
+  - Backend (voltgrid-api): Python 3.12, FastAPI, SQLAlchemy 2.0 async, asyncpg + psycopg,
+    Alembic, pydantic-settings v2, python-jose (JWT), passlib[bcrypt], Authlib (SSO OIDC),
+    APScheduler (AsyncIOScheduler), websockets. Base de datos: PostgreSQL 16.
+  - Frontend (voltgrid-web): Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn/ui,
+    Zustand, Axios, Recharts, next-pwa, WebSocket client.
+  - Infraestructura: Docker (multi-stage), Docker Compose, Kubernetes (Kustomize base + overlays),
+    GitHub Actions (CI/CD).
+
+  Arquitectura: API REST por capas (api/routers -> services -> models/db) con realtime por WebSockets.
+  Multi-tenancy real con tenant_id por fila y Row Level Security (RLS) de PostgreSQL como frontera
+  de aislamiento. Whitelabel por organización (logo, color, nombre). Auth JWT con refresh rotation
+  y roles (superadmin/org_admin/operator/viewer); SSO Google/Microsoft con mapeo dominio->tenant.
+
+  Dominio: Organization (tenant), User, ChargingStation, ChargingSession, StatusLog,
+  SchedulerConfig, RefreshToken.
+
+  Idioma: documentación y comentarios en español; identificadores de código en inglés (convención
+  Python/TypeScript). Control de versiones: conventional commits; ramas feature/[change-name].
+
+  Estándares del proyecto (fuente única de verdad): toda creación e implementación de artefactos
+  DEBE seguir el contexto técnico en docs/. Leer y aplicar:
+  - docs/base-standards.md — principios base, idioma, skills, planificación y reglas OpenSpec.
+  - docs/documentation-standards.md — estructura y mantenimiento de la documentación.
+  - docs/backend-standards.md — estándares del backend FastAPI/PostgreSQL/RLS.
+  - docs/frontend-standards.md — estándares del frontend Next.js.
+  - docs/infra-standards.md — estándares de Docker/Kubernetes/CI.
+
+  Para implementar: adopta el agente relevante de ai-specs/agents/ según el tipo de cambio
+  (backend-developer, frontend-developer, solution-architect, security-reviewer).
+
+# ---------------------------------------------------------------------------
+# Reglas por artefacto
+# ---------------------------------------------------------------------------
+rules:
+  _global:
+    - Antes de crear cualquier artefacto, leer y aplicar docs/base-standards.md
+    - Aplicar los docs/*-standards.md que correspondan al área del cambio
+    - Mantener consistencia con los specs existentes en openspec/specs/
+    - El aislamiento entre tenants (RLS) es invariante; ningún cambio debe permitir fuga de datos entre organizaciones
+
+  tasks:
+    - Dividir las tareas en bloques de máximo 2 horas
+    - El primer paso (Step 0) SIEMPRE es crear la feature branch
+    - Toda lista de tareas debe incluir los pasos obligatorios definidos en
+      .claude/rules/openspec-tasks-mandatory-steps.md (rama, pruebas, verificación manual, documentación)
+
+  spec:
+    - Definir QUÉ debe hacer el sistema en términos de requisitos y escenarios verificables
+    - Cada capability nueva genera un specs/<nombre>/spec.md en kebab-case
+
+  design:
+    - Documentar el CÓMO: decisiones técnicas, alternativas consideradas y trade-offs
+    - Incluir solo lo necesario para implementar sin ambigüedad
