@@ -31,3 +31,6 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Notas locales (credenciales, happy path)
+LOCAL.md
