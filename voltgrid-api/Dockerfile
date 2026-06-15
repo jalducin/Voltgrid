@@ -29,7 +29,8 @@ COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /app
 COPY --chown=appuser:appuser . .
-RUN chmod +x /app/docker-entrypoint.sh
+# Normaliza line endings (CRLF → LF) para que el shebang funcione en Linux.
+RUN sed -i 's/\r//' /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
 
 USER appuser
 EXPOSE 8000
